@@ -5,6 +5,7 @@ const API_ACCEPT = "application/json;api-version=3.0-preview.1";
 
 export async function queryExtensions(body: unknown): Promise<unknown> {
   const url = `${config.upstreamUrl}${QUERY_PATH}`;
+  const start = Date.now();
 
   const res = await fetch(url, {
     method: "POST",
@@ -14,6 +15,8 @@ export async function queryExtensions(body: unknown): Promise<unknown> {
     },
     body: JSON.stringify(body),
   });
+
+  console.log(`  ↳ Upstream POST ${QUERY_PATH} → ${res.status} (${Date.now() - start}ms)`);
 
   if (!res.ok) {
     throw new Error(`Upstream responded with ${res.status}: ${res.statusText}`);
@@ -27,9 +30,11 @@ export async function fetchAsset(upstreamUrl: string): Promise<{
   headers: Record<string, string>;
   status: number;
 }> {
+  const start = Date.now();
   const res = await fetch(upstreamUrl, {
     redirect: "follow",
   });
+  console.log(`  ↳ Upstream GET → ${res.status} (${Date.now() - start}ms)`);
 
   const headers: Record<string, string> = {};
   for (const key of ["content-type", "content-length", "content-disposition"]) {

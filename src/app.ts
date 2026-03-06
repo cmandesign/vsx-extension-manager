@@ -9,8 +9,13 @@ const app = express();
 app.use(express.json({ limit: "5mb" }));
 
 // Request logging
-app.use((req, _res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+app.use((req, res, next) => {
+  const start = Date.now();
+  console.log(`→ ${new Date().toISOString()} ${req.method} ${req.url}`);
+  res.on("close", () => {
+    const duration = Date.now() - start;
+    console.log(`← ${new Date().toISOString()} ${req.method} ${req.url} ${res.statusCode} (${duration}ms)`);
+  });
   next();
 });
 

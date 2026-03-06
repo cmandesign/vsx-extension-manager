@@ -8,6 +8,8 @@ const router = Router();
 router.post("/_apis/public/gallery/extensionquery", async (req, res, next) => {
   try {
     const upstream = (await queryExtensions(req.body)) as ExtensionQueryResponse;
+    const count = upstream.results?.[0]?.extensions?.length ?? 0;
+    console.log(`  ↳ Query returned ${count} extension(s)`);
     const rewritten = rewriteUrls(upstream);
     res.json(rewritten);
   } catch (err) {

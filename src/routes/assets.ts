@@ -11,6 +11,7 @@ router.get("/assets/:publisher/:extension/:version/assetbyname/:assetType", asyn
     const { publisher, extension, version, assetType } = req.params;
 
     const upstreamUrl = `https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${extension}/${version}/assetbyname/${assetType}`;
+    console.log(`  ↳ Fetching upstream: ${upstreamUrl}`);
 
     await streamAsset(upstreamUrl, res);
   } catch (err) {
@@ -25,6 +26,7 @@ router.get(
     try {
       const { publisher, extension, version } = req.params;
       const upstreamUrl = `${config.upstreamUrl}/_apis/public/gallery/publishers/${publisher}/vsextensions/${extension}/${version}/vspackage`;
+      console.log(`  ↳ Fetching upstream: ${upstreamUrl}`);
 
       await streamAsset(upstreamUrl, res);
     } catch (err) {
