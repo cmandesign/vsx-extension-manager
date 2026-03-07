@@ -1,0 +1,29 @@
+# Local HTTPS development using mkcert
+# Usage: docker compose -f docker-compose.local.yml up -d
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - UPSTREAM_URL=https://marketplace.visualstudio.com
+      - PUBLIC_BASE_URL=https://localhost
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/local.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - app
+    networks:
+      - internal
+
+networks:
+  internal:
