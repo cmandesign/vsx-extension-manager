@@ -74,27 +74,19 @@ For VS Code forks that support custom marketplace configuration natively, set th
 3. Asset URLs in responses are rewritten to point back through the proxy
 4. When VS Code downloads an extension, the request goes through the proxy which streams it from the upstream marketplace
 
-## Local HTTPS (Docker + mkcert)
+## Local HTTPS (Docker)
 
-For local development with HTTPS. Certificates are generated inside a Docker container — no extra tools required.
+For local development with HTTPS. Certificates are generated automatically via an init container — no extra tools required.
 
-### 1. Generate certificates
-
-```bash
-./init-local-certs.sh
-```
-
-This runs mkcert inside Docker and creates certs in `./certs/`. Works on macOS, Linux, and Windows (Git Bash / WSL).
-
-> **Note:** The generated certs are self-signed. Your browser will show a warning you can accept. To avoid the warning, install [mkcert](https://github.com/FiloSottile/mkcert) locally and run `mkcert -install` to trust the CA.
-
-### 3. Start
+### 1. Start
 
 ```bash
 docker compose -f docker-compose.local.yml up -d
 ```
 
-The proxy is now available at `https://localhost`.
+On first run, the `mkcert` service generates self-signed certs into a Docker volume. Nginx waits for it to finish, then starts serving on `https://localhost`.
+
+> **Note:** Your browser will show a certificate warning. Accept it to proceed. To avoid the warning, install [mkcert](https://github.com/FiloSottile/mkcert) locally and run `mkcert -install` to trust the CA.
 
 ### 4. Configure VS Code
 
