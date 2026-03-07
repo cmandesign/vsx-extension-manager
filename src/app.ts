@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { config } from "./config.js";
-import { pool } from "./db/connection.js";
+import { getPool, dbAvailable } from "./db/connection.js";
 import { optionalUser } from "./middleware/auth.js";
 import { downloadTracker } from "./middleware/download-tracker.js";
 
@@ -24,7 +24,10 @@ const app = express();
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "../views"));
 
-// CORS — allow VS Code (vscode-file:// origin) to reach the proxy
+// Static files
+app.use("/static", express.static(path.join(__dirname, "../public")));
+
+// CORS - allow VS Code (vscode-file:// origin) to reach the proxy
 app.use((_req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -40,35 +43,45 @@ app.use((_req, res, next) => {
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware
-const MySQLStore = mysqlSessionStore(session as any);
-const sessionStore = new MySQLStore({
-  createDatabaseTable: false, // We create it in init.ts
-  schema: {
-    tableName: "sessions",
-    columnNames: {
-      session_id: "session_id",
-      expires: "expires",
-      data: "data",
-    },
-  },
-}, pool as any);
+// Session middleware - lazily initialized, skipped when DB is unavailable
+let sessionMiddleware: express.RequestHandler | null = null;
 
-app.use(
-  session({
-    store: sessionStore,
-    secret: config.sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      httpOnly: true,
-      sameSite: "lax",
-    },
-  })
-);
+app.use((req, res, next) => {
+  if (!dbAvailable) {
+    res.locals.user = null;
+    next();
+    return;
+  }
+  if (!sessionMiddleware) {
+    const MySQLStore = mysqlSessionStore(session as any);
+    const sessionStore = new MySQLStore({
+      createDatabaseTable: false,
+      schema: {
+        tableName: "sessions",
+        columnNames: {
+          session_id: "session_id",
+          expires: "expires",
+          data: "data",
+        },
+      },
+    }, getPool() as any);
 
-// Attach user to all requests
+    sessionMiddleware = session({
+      store: sessionStore,
+      secret: config.sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        sameSite: "lax",
+      },
+    });
+  }
+  sessionMiddleware(req, res, next);
+});
+
+// Attach user to all requests (skips DB lookup when unavailable)
 app.use(optionalUser);
 
 // Request logging

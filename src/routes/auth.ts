@@ -1,9 +1,14 @@
 import { Router } from "express";
+import { dbAvailable } from "../db/connection.js";
 import { findByUsername, verifyPassword } from "../services/user-service.js";
 
 const router = Router();
 
 router.get("/login", (req, res) => {
+  if (!dbAvailable) {
+    res.status(503).send("Login requires database. Please configure MySQL.");
+    return;
+  }
   if (res.locals.user) {
     res.redirect("/");
     return;

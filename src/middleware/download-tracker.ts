@@ -1,7 +1,13 @@
 import type { Request, Response, NextFunction } from "express";
+import { dbAvailable } from "../db/connection.js";
 import { trackDownload } from "../services/stats-service.js";
 
 export function downloadTracker(req: Request, res: Response, next: NextFunction): void {
+  if (!dbAvailable) {
+    next();
+    return;
+  }
+
   // Track after response is sent (non-blocking)
   res.on("finish", () => {
     if (res.statusCode >= 200 && res.statusCode < 300) {

@@ -1,4 +1,4 @@
-import { pool } from "../db/connection.js";
+import { getPool } from "../db/connection.js";
 import bcrypt from "bcryptjs";
 
 export interface User {
@@ -11,25 +11,25 @@ export interface User {
 }
 
 export async function findByUsername(username: string): Promise<User | null> {
-  const [rows] = await pool.execute("SELECT * FROM users WHERE username = ?", [username]);
+  const [rows] = await getPool().execute("SELECT * FROM users WHERE username = ?", [username]);
   const users = rows as User[];
   return users[0] || null;
 }
 
 export async function findById(id: number): Promise<User | null> {
-  const [rows] = await pool.execute("SELECT * FROM users WHERE id = ?", [id]);
+  const [rows] = await getPool().execute("SELECT * FROM users WHERE id = ?", [id]);
   const users = rows as User[];
   return users[0] || null;
 }
 
 export async function listUsers(): Promise<User[]> {
-  const [rows] = await pool.execute("SELECT id, username, role, created_at, updated_at FROM users ORDER BY id");
+  const [rows] = await getPool().execute("SELECT id, username, role, created_at, updated_at FROM users ORDER BY id");
   return rows as User[];
 }
 
 export async function createUser(username: string, password: string, role: "admin" | "viewer"): Promise<void> {
   const hash = await bcrypt.hash(password, 10);
-  await pool.execute(
+  await getPool().execute(
     "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
     [username, hash, role]
   );
@@ -54,11 +54,11 @@ export async function updateUser(id: number, data: { username?: string; password
 
   if (sets.length === 0) return;
   values.push(id);
-  await pool.execute(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`, values);
+  await getPool().execute(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`, values);
 }
 
 export async function deleteUser(id: number): Promise<void> {
-  await pool.execute("DELETE FROM users WHERE id = ?", [id]);
+  await getPool().execute("DELETE FROM users WHERE id = ?", [id]);
 }
 
 export async function verifyPassword(user: User, password: string): Promise<boolean> {
