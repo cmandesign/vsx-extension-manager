@@ -94,7 +94,11 @@ choco install mkcert
 ### 2. Generate certificates
 
 ```bash
+# macOS / Linux
 ./init-local-certs.sh
+
+# Windows (PowerShell)
+.\init-local-certs.ps1
 ```
 
 This creates trusted certs in `./certs/` and installs the local CA into your system trust store.
