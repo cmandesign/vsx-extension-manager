@@ -17,19 +17,19 @@ export async function trackDownload(
   assetType: string,
   userId: number | null
 ): Promise<void> {
-  await getPool().execute(
+  await getPool().query(
     "INSERT INTO download_stats (publisher, extension_name, version, asset_type, user_id) VALUES (?, ?, ?, ?, ?)",
     [publisher, extensionName, version, assetType, userId]
   );
 }
 
 export async function getTotalDownloads(): Promise<number> {
-  const [rows] = await getPool().execute("SELECT COUNT(*) as count FROM download_stats");
+  const [rows] = await getPool().query("SELECT COUNT(*) as count FROM download_stats");
   return (rows as Array<{ count: number }>)[0].count;
 }
 
 export async function getTopExtensions(limit = 10): Promise<Array<{ publisher: string; extension_name: string; downloads: number }>> {
-  const [rows] = await getPool().execute(
+  const [rows] = await getPool().query(
     `SELECT publisher, extension_name, COUNT(*) as downloads
      FROM download_stats
      GROUP BY publisher, extension_name
@@ -41,7 +41,7 @@ export async function getTopExtensions(limit = 10): Promise<Array<{ publisher: s
 }
 
 export async function getRecentDownloads(limit = 20): Promise<DownloadRecord[]> {
-  const [rows] = await getPool().execute(
+  const [rows] = await getPool().query(
     `SELECT ds.*, u.username
      FROM download_stats ds
      LEFT JOIN users u ON ds.user_id = u.id
@@ -53,7 +53,7 @@ export async function getRecentDownloads(limit = 20): Promise<DownloadRecord[]> 
 }
 
 export async function getDownloadsByDate(days = 30): Promise<Array<{ date: string; downloads: number }>> {
-  const [rows] = await getPool().execute(
+  const [rows] = await getPool().query(
     `SELECT DATE(downloaded_at) as date, COUNT(*) as downloads
      FROM download_stats
      WHERE downloaded_at >= DATE_SUB(NOW(), INTERVAL ? DAY)

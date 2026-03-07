@@ -11,25 +11,25 @@ export interface User {
 }
 
 export async function findByUsername(username: string): Promise<User | null> {
-  const [rows] = await getPool().execute("SELECT * FROM users WHERE username = ?", [username]);
+  const [rows] = await getPool().query("SELECT * FROM users WHERE username = ?", [username]);
   const users = rows as User[];
   return users[0] || null;
 }
 
 export async function findById(id: number): Promise<User | null> {
-  const [rows] = await getPool().execute("SELECT * FROM users WHERE id = ?", [id]);
+  const [rows] = await getPool().query("SELECT * FROM users WHERE id = ?", [id]);
   const users = rows as User[];
   return users[0] || null;
 }
 
 export async function listUsers(): Promise<User[]> {
-  const [rows] = await getPool().execute("SELECT id, username, role, created_at, updated_at FROM users ORDER BY id");
+  const [rows] = await getPool().query("SELECT id, username, role, created_at, updated_at FROM users ORDER BY id");
   return rows as User[];
 }
 
 export async function createUser(username: string, password: string, role: "admin" | "viewer"): Promise<void> {
   const hash = await bcrypt.hash(password, 10);
-  await getPool().execute(
+  await getPool().query(
     "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
     [username, hash, role]
   );
@@ -54,11 +54,11 @@ export async function updateUser(id: number, data: { username?: string; password
 
   if (sets.length === 0) return;
   values.push(id);
-  await getPool().execute(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`, values);
+  await getPool().query(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`, values);
 }
 
 export async function deleteUser(id: number): Promise<void> {
-  await getPool().execute("DELETE FROM users WHERE id = ?", [id]);
+  await getPool().query("DELETE FROM users WHERE id = ?", [id]);
 }
 
 export async function verifyPassword(user: User, password: string): Promise<boolean> {

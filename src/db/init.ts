@@ -45,7 +45,7 @@ export async function initDatabase(): Promise<boolean> {
   try {
     const pool = getPool();
 
-    await pool.execute(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(255) NOT NULL UNIQUE,
@@ -56,7 +56,7 @@ export async function initDatabase(): Promise<boolean> {
       )
     `);
 
-    await pool.execute(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS download_stats (
         id INT AUTO_INCREMENT PRIMARY KEY,
         publisher VARCHAR(255) NOT NULL,
@@ -71,7 +71,7 @@ export async function initDatabase(): Promise<boolean> {
       )
     `);
 
-    await pool.execute(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS sessions (
         session_id VARCHAR(128) NOT NULL PRIMARY KEY,
         expires INT UNSIGNED NOT NULL,
@@ -81,11 +81,11 @@ export async function initDatabase(): Promise<boolean> {
     `);
 
     // Seed default admin if no users exist
-    const [rows] = await pool.execute("SELECT COUNT(*) as count FROM users");
+    const [rows] = await pool.query("SELECT COUNT(*) as count FROM users");
     const count = (rows as Array<{ count: number }>)[0].count;
     if (count === 0) {
       const hash = await bcrypt.hash("admin", 10);
-      await pool.execute(
+      await pool.query(
         "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
         ["admin", hash, "admin"]
       );
