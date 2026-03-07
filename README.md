@@ -76,32 +76,17 @@ For VS Code forks that support custom marketplace configuration natively, set th
 
 ## Local HTTPS (Docker + mkcert)
 
-For local development with HTTPS using [mkcert](https://github.com/FiloSottile/mkcert) (locally-trusted certificates).
+For local development with HTTPS. Certificates are generated inside a Docker container — no extra tools required.
 
-### 1. Install mkcert
-
-```bash
-# macOS
-brew install mkcert
-
-# Linux (Debian/Ubuntu)
-apt install mkcert
-
-# Windows
-choco install mkcert
-```
-
-### 2. Generate certificates
+### 1. Generate certificates
 
 ```bash
-# macOS / Linux
 ./init-local-certs.sh
-
-# Windows (PowerShell)
-.\init-local-certs.ps1
 ```
 
-This creates trusted certs in `./certs/` and installs the local CA into your system trust store.
+This runs mkcert inside Docker and creates certs in `./certs/`. Works on macOS, Linux, and Windows (Git Bash / WSL).
+
+> **Note:** The generated certs are self-signed. Your browser will show a warning you can accept. To avoid the warning, install [mkcert](https://github.com/FiloSottile/mkcert) locally and run `mkcert -install` to trust the CA.
 
 ### 3. Start
 
