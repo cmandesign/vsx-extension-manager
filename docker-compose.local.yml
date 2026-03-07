@@ -2,15 +2,16 @@
 # Usage: docker compose -f docker-compose.local.yml up -d
 services:
   mkcert:
-    image: golang:alpine
+    image: alpine:latest
     volumes:
       - certs:/certs
     command: >
       sh -c "
+        set -e
         if [ -f /certs/localhost.pem ] && [ -f /certs/localhost-key.pem ]; then
           echo 'Certificates already exist, skipping generation.'
         else
-          apk add --no-cache mkcert > /dev/null 2>&1
+          apk add --no-cache mkcert
           mkcert -cert-file /certs/localhost.pem -key-file /certs/localhost-key.pem localhost 127.0.0.1 ::1
           echo 'Certificates generated.'
         fi
