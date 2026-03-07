@@ -84,9 +84,9 @@ For local development with HTTPS. Certificates are generated automatically via a
 docker compose -f docker-compose.local.yml up -d
 ```
 
-On first run, the `mkcert` service generates self-signed certs into a Docker volume. Nginx waits for it to finish, then starts serving on `https://localhost`.
+On first run, the `certs` init container generates a self-signed certificate using OpenSSL into a Docker volume. Nginx waits for it to finish, then starts serving on `https://localhost`.
 
-> **Note:** Your browser will show a certificate warning. Accept it to proceed. To avoid the warning, install [mkcert](https://github.com/FiloSottile/mkcert) locally and run `mkcert -install` to trust the CA.
+> **Note:** Your browser will show a certificate warning since the cert is self-signed. Accept it to proceed.
 
 ### 4. Configure VS Code
 
