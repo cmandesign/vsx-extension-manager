@@ -1,0 +1,102 @@
+<%- include('layout', { title: extension.displayName || extension.extensionName }) %>
+
+<%
+  const pub = extension.publisher?.publisherName || 'unknown';
+  const name = extension.extensionName || 'unknown';
+  const displayName = extension.displayName || name;
+  const desc = extension.shortDescription || 'No description available';
+  const version = extension.versions?.[0];
+  const versionStr = version?.version || 'unknown';
+  const iconFile = version?.files?.find(f => f.assetType === 'Microsoft.VisualStudio.Services.Icons.Default' || f.assetType === 'Microsoft.VisualStudio.Services.Icons.Small');
+  const iconUrl = iconFile?.source || '';
+  const stats = extension.statistics || [];
+  const installs = stats.find(s => s.statisticName === 'install')?.value || 0;
+  const rating = stats.find(s => s.statisticName === 'averagerating')?.value || 0;
+  const ratingCount = stats.find(s => s.statisticName === 'ratingcount')?.value || 0;
+
+  // Find README content
+  const readmeFile = version?.files?.find(f => f.assetType === 'Microsoft.VisualStudio.Services.Content.Details');
+  const changelogFile = version?.files?.find(f => f.assetType === 'Microsoft.VisualStudio.Services.Content.Changelog');
+
+  // VSIX download link
+  const vsixFile = version?.files?.find(f => f.assetType === 'Microsoft.VisualStudio.Services.VSIXPackage');
+  const vsixUrl = vsixFile?.source || '';
+%>
+
+<div class="container mt-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">Browse</a></li>
+      <li class="breadcrumb-item active"><%= displayName %></li>
+    </ol>
+  </nav>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-start">
+        <% if (iconUrl) { %>
+          <img src="<%= iconUrl %>" alt="" class="ext-icon-lg me-4">
+        <% } else { %>
+          <div class="ext-icon-lg me-4 bg-secondary d-flex align-items-center justify-content-center text-white rounded">
+            <i class="bi bi-puzzle" style="font-size: 2rem;"></i>
+          </div>
+        <% } %>
+        <div class="flex-grow-1">
+          <h2 class="mb-1"><%= displayName %></h2>
+          <p class="text-muted mb-2"><%= pub %> &middot; v<%= versionStr %></p>
+          <p class="mb-3"><%= desc %></p>
+
+          <div class="d-flex gap-4 mb-3">
+            <span><i class="bi bi-download"></i> <strong><%= Math.round(installs).toLocaleString() %></strong> installs</span>
+            <% if (rating > 0) { %>
+            <span>
+              <% for (let i = 1; i <= 5; i++) { %>
+                <i class="bi bi-star<%= i <= Math.round(rating) ? '-fill text-warning' : '' %>"></i>
+              <% } %>
+              <strong><%= rating.toFixed(1) %></strong> (<%= Math.round(ratingCount) %> ratings)
+            </span>
+            <% } %>
+          </div>
+
+          <div class="d-flex gap-2">
+            <% if (vsixUrl) { %>
+              <a href="<%= vsixUrl %>" class="btn btn-primary">
+                <i class="bi bi-download"></i> Download VSIX
+              </a>
+            <% } %>
+            <button class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText('ext install <%= pub %>.<%= name %>')">
+              <i class="bi bi-clipboard"></i> Copy Install Command
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Version History -->
+  <div class="card">
+    <div class="card-header">
+      <h5 class="mb-0">Version History</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Last Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (extension.versions || []).slice(0, 10).forEach(function(v) { %>
+          <tr>
+            <td><%= v.version %></td>
+            <td><%= v.lastUpdated ? new Date(v.lastUpdated).toLocaleDateString() : 'N/A' %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('footer') %>

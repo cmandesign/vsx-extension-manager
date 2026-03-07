@@ -1,0 +1,117 @@
+<%- include('../layout', { title: 'Admin Dashboard' }) %>
+
+<div class="container mt-4">
+  <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+
+  <div class="row g-3 mt-3">
+    <div class="col-md-4">
+      <div class="card stat-card primary">
+        <div class="card-body">
+          <h6 class="text-muted">Total Downloads</h6>
+          <h3><%= totalDownloads.toLocaleString() %></h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card success">
+        <div class="card-body">
+          <h6 class="text-muted">Unique Extensions</h6>
+          <h3><%= topExtensions.length %></h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card warning">
+        <div class="card-body">
+          <h6 class="text-muted">Last 30 Days</h6>
+          <h3><%= downloadsByDate.reduce((sum, d) => sum + d.downloads, 0).toLocaleString() %></h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-4 g-3">
+    <!-- Top Extensions -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h5 class="mb-0">Top Extensions</h5></div>
+        <div class="card-body">
+          <% if (topExtensions.length === 0) { %>
+            <p class="text-muted">No downloads yet</p>
+          <% } else { %>
+          <table class="table table-sm">
+            <thead>
+              <tr><th>Extension</th><th>Downloads</th></tr>
+            </thead>
+            <tbody>
+              <% topExtensions.forEach(function(ext) { %>
+              <tr>
+                <td><%= ext.publisher %>.<%= ext.extension_name %></td>
+                <td><span class="badge bg-primary"><%= ext.downloads %></span></td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Downloads by Date -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h5 class="mb-0">Downloads (Last 30 Days)</h5></div>
+        <div class="card-body">
+          <% if (downloadsByDate.length === 0) { %>
+            <p class="text-muted">No downloads yet</p>
+          <% } else { %>
+          <table class="table table-sm">
+            <thead>
+              <tr><th>Date</th><th>Downloads</th></tr>
+            </thead>
+            <tbody>
+              <% downloadsByDate.slice(-10).forEach(function(d) { %>
+              <tr>
+                <td><%= typeof d.date === 'object' ? d.date.toISOString().split('T')[0] : d.date %></td>
+                <td><span class="badge bg-success"><%= d.downloads %></span></td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Downloads -->
+  <div class="card mt-4">
+    <div class="card-header"><h5 class="mb-0">Recent Downloads</h5></div>
+    <div class="card-body">
+      <% if (recentDownloads.length === 0) { %>
+        <p class="text-muted">No downloads yet</p>
+      <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr><th>Extension</th><th>Version</th><th>Type</th><th>User</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            <% recentDownloads.forEach(function(dl) { %>
+            <tr>
+              <td><%= dl.publisher %>.<%= dl.extension_name %></td>
+              <td><%= dl.version %></td>
+              <td><small class="text-muted"><%= dl.asset_type %></small></td>
+              <td><%= dl.username || 'Anonymous' %></td>
+              <td><%= new Date(dl.downloaded_at).toLocaleString() %></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../footer') %>
