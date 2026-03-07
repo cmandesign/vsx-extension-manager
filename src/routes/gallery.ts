@@ -11,6 +11,7 @@ router.post("/_apis/public/gallery/extensionquery", async (req, res, next) => {
     const count = upstream.results?.[0]?.extensions?.length ?? 0;
     console.log(`  ↳ Query returned ${count} extension(s)`);
     const rewritten = rewriteUrls(upstream);
+    res.setHeader("Content-Type", "application/json;api-version=3.0-preview.1");
     res.json(rewritten);
   } catch (err) {
     next(err);
