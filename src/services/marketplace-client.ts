@@ -3,7 +3,10 @@ import { config } from "../config.js";
 const QUERY_PATH = "/_apis/public/gallery/extensionquery";
 const API_ACCEPT = "application/json;api-version=3.0-preview.1";
 
-export async function queryExtensions(body: unknown): Promise<unknown> {
+export async function queryExtensions(body: unknown): Promise<{
+  data: unknown;
+  headers: Record<string, string>;
+}> {
   const url = `${config.upstreamUrl}${QUERY_PATH}`;
   const start = Date.now();
 
@@ -22,7 +25,15 @@ export async function queryExtensions(body: unknown): Promise<unknown> {
     throw new Error(`Upstream responded with ${res.status}: ${res.statusText}`);
   }
 
-  return res.json();
+  const headers: Record<string, string> = {};
+  const skipHeaders = new Set(["content-encoding", "content-length", "transfer-encoding", "connection"]);
+  res.headers.forEach((val, key) => {
+    if (!skipHeaders.has(key)) {
+      headers[key] = val;
+    }
+  });
+
+  return { data: await res.json(), headers };
 }
 
 export async function fetchAsset(upstreamUrl: string): Promise<{

@@ -7,11 +7,16 @@ const router = Router();
 
 router.post("/_apis/public/gallery/extensionquery", async (req, res, next) => {
   try {
-    const upstream = (await queryExtensions(req.body)) as ExtensionQueryResponse;
+    const { data, headers } = await queryExtensions(req.body);
+    const upstream = data as ExtensionQueryResponse;
     const count = upstream.results?.[0]?.extensions?.length ?? 0;
     console.log(`  ↳ Query returned ${count} extension(s)`);
     const rewritten = rewriteUrls(upstream);
-    res.setHeader("Content-Type", "application/json;api-version=3.0-preview.1");
+
+    // Forward upstream response headers
+    for (const [key, val] of Object.entries(headers)) {
+      res.setHeader(key, val);
+    }
     res.json(rewritten);
   } catch (err) {
     next(err);
