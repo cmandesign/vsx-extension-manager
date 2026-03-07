@@ -8,6 +8,11 @@ const router = Router();
 // All admin routes require admin role
 router.use("/admin", requireAdmin);
 
+// Redirect /admin to /admin/dashboard
+router.get("/admin", (_req, res) => {
+  res.redirect("/admin/dashboard");
+});
+
 // Dashboard with download stats
 router.get("/admin/dashboard", async (_req, res) => {
   const [totalDownloads, topExtensions, recentDownloads, downloadsByDate] = await Promise.all([

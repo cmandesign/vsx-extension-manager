@@ -64,7 +64,7 @@ app.use((req, res, next) => {
           data: "data",
         },
       },
-    }, getPool() as any);
+    }, (getPool() as any).pool);
 
     sessionMiddleware = session({
       store: sessionStore,
