@@ -74,6 +74,61 @@ For VS Code forks that support custom marketplace configuration natively, set th
 3. Asset URLs in responses are rewritten to point back through the proxy
 4. When VS Code downloads an extension, the request goes through the proxy which streams it from the upstream marketplace
 
+## Production Deployment (Docker + HTTPS)
+
+The project includes Docker Compose with nginx reverse proxy and automatic Let's Encrypt SSL.
+
+### 1. Configure
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```
+DOMAIN=marketplace.example.com
+PUBLIC_BASE_URL=https://marketplace.example.com
+```
+
+### 2. Get SSL Certificate
+
+Point your domain's DNS to your server, then run:
+
+```bash
+DOMAIN=marketplace.example.com EMAIL=you@example.com ./init-letsencrypt.sh
+```
+
+Use `STAGING=1` to test with Let's Encrypt staging servers first.
+
+### 3. Start
+
+```bash
+docker compose up -d
+```
+
+Certificates auto-renew via the certbot container.
+
+### 4. Configure VS Code
+
+```bash
+VSCODE_GALLERY_SERVICE_URL="https://marketplace.example.com/_apis/public/gallery" \
+VSCODE_GALLERY_ITEM_URL="https://marketplace.example.com/items" \
+code .
+```
+
+Or edit `product.json`:
+
+```json
+{
+  "extensionsGallery": {
+    "serviceUrl": "https://marketplace.example.com/_apis/public/gallery",
+    "itemUrl": "https://marketplace.example.com/items",
+    "resourceUrlTemplate": "https://marketplace.example.com/assets/{publisher}/{name}/{version}/assetbyname/{path}"
+  }
+}
+```
+
 ## Scripts
 
 ```bash
