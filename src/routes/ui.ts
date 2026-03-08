@@ -39,7 +39,7 @@ router.get("/", async (req, res) => {
           },
         ],
         assetTypes: [],
-        flags: 0x200 | 0x2 | 0x1 | 0x80, // IncludeFiles | IncludeStatistics | IncludeVersions | IncludeAssetUri
+        flags: 0x200 | 0x2 | 0x1 | 0x80, // IncludeLatestVersionOnly | IncludeFiles | IncludeVersions | IncludeAssetUri
       };
 
       const { data } = await queryExtensions(queryBody);
@@ -142,7 +142,7 @@ router.get("/extension/:publisher/:name", async (req, res) => {
         },
       ],
       assetTypes: [],
-      flags: 0x200 | 0x2 | 0x1 | 0x80 | 0x100, // IncludeFiles | IncludeStatistics | IncludeVersions | IncludeAssetUri | IncludeVersionProperties
+      flags: 0x1 | 0x2 | 0x10 | 0x80 | 0x100, // IncludeVersions | IncludeFiles | IncludeVersionProperties | IncludeAssetUri | IncludeStatistics
     };
 
     const { data } = await queryExtensions(queryBody);
