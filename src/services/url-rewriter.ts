@@ -1,11 +1,7 @@
 import type { ExtensionQueryResponse } from "../types/marketplace.js";
-import { config } from "../config.js";
-
-const VSASSETS_PATTERN = /https?:\/\/([^.]+)\.gallery\.vsassets\.io\/_apis\/public\/gallery\/publisher\/[^/]+\/extension\/[^/]+\/([^/]+)/g;
-const MARKETPLACE_PATTERN = /https?:\/\/marketplace\.visualstudio\.com\/_apis\/public\/gallery\/publisher\/[^/]+\/extension\/[^/]+\/([^/]+)/g;
 
 function buildProxyAssetUri(publisher: string, extension: string, version: string): string {
-  return `${config.publicBaseUrl}/assets/${publisher}/${extension}/${version}`;
+  return `/assets/${publisher}/${extension}/${version}`;
 }
 
 function rewriteSourceUrl(source: string, publisher: string, extension: string, version: string, originalAssetUri?: string): string {
