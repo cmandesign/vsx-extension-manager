@@ -100,16 +100,21 @@
       </div>
     </div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
     (function() {
       fetch('<%= readmeFile.source %>')
         .then(function(r) { return r.text(); })
         .then(function(text) {
           var el = document.getElementById('readme-content');
-          // Check if it looks like HTML
           if (text.trim().startsWith('<')) {
+            // Already HTML
             el.innerHTML = text;
+          } else if (typeof marked !== 'undefined') {
+            // Render markdown
+            el.innerHTML = marked.parse(text);
           } else {
+            // Fallback: plain text
             el.innerHTML = '<pre style="white-space: pre-wrap; word-break: break-word;">' +
               text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
           }

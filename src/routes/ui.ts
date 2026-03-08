@@ -2,13 +2,14 @@ import { Router } from "express";
 import { queryExtensions } from "../services/marketplace-client.js";
 import { rewriteUrls, getBaseUrl } from "../services/url-rewriter.js";
 import { dbAvailable } from "../db/connection.js";
-import { getPolicyMode, getBulkListStatus } from "../services/policy-service.js";
+import { getPolicyMode, getBulkListStatus, addToList, removeFromListByExtensionId } from "../services/policy-service.js";
+import type { ListType } from "../services/policy-service.js";
 import { getRules, filterExtensions, isExtensionAllowed } from "../services/rule-engine.js";
 import type { Extension, ExtensionQueryResponse } from "../types/marketplace.js";
 
 const router = Router();
 
-// Browse extensions page
+// Browse extensions page (unified: regular users see filtered, admins see policy controls)
 router.get("/", async (req, res) => {
   const search = (req.query.search as string) || "";
   const page = parseInt(req.query.page as string) || 1;
@@ -18,6 +19,9 @@ router.get("/", async (req, res) => {
   let extensions: Extension[] = [];
   let totalCount = 0;
   const blockedExtIds = new Set<string>();
+  let policyMode = "blacklist";
+  let policyStatus = new Map<string, ListType>();
+  const isAdmin = res.locals.user?.role === "admin";
 
   try {
     if (search || page >= 1) {
@@ -50,23 +54,26 @@ router.get("/", async (req, res) => {
       // Apply policy filtering if DB is available
       if (dbAvailable) {
         try {
-          const [policyMode, rules] = await Promise.all([getPolicyMode(), getRules()]);
+          const [mode, rules] = await Promise.all([getPolicyMode(), getRules()]);
+          policyMode = mode;
           const extIds = extensions.map((ext) =>
             `${ext.publisher.publisherName}.${ext.extensionName}`.toLowerCase()
           );
           const policyListMap = await getBulkListStatus(extIds);
+          policyStatus = policyListMap;
 
           // Identify blocked extensions
           for (const ext of extensions) {
             const extId = `${ext.publisher.publisherName}.${ext.extensionName}`.toLowerCase();
             const listEntry = policyListMap.get(extId) || null;
-            if (!isExtensionAllowed(ext, rules, policyMode, listEntry)) {
+            if (!isExtensionAllowed(ext, rules, mode, listEntry)) {
               blockedExtIds.add(extId);
             }
           }
 
-          if (!showBlocked) {
-            extensions = filterExtensions(extensions, rules, policyMode, policyListMap);
+          // Non-admin: always filter. Admin: filter unless showBlocked is checked
+          if (!showBlocked || !isAdmin) {
+            extensions = filterExtensions(extensions, rules, mode, policyListMap);
             totalCount = extensions.length;
           }
         } catch (err) {
@@ -85,9 +92,36 @@ router.get("/", async (req, res) => {
     pageSize,
     totalCount,
     totalPages: Math.ceil(totalCount / pageSize),
-    showBlocked,
+    showBlocked: isAdmin ? showBlocked : false,
     blockedExtIds: Array.from(blockedExtIds),
+    isAdmin,
+    policyMode,
+    policyStatus,
+    success: (req.query.success as string) || null,
   });
+});
+
+// Handle policy actions from browse page (admin only)
+router.post("/extensions/policy", async (req, res) => {
+  if (res.locals.user?.role !== "admin") {
+    res.redirect("/");
+    return;
+  }
+
+  const { extension_id, list_type, action, search: formSearch, page: formPage, show_blocked: formShowBlocked } = req.body;
+
+  if (action === "remove") {
+    await removeFromListByExtensionId(extension_id);
+  } else if (action === "add" && (list_type === "whitelist" || list_type === "blacklist")) {
+    await addToList(extension_id, list_type, res.locals.user?.id || null);
+  }
+
+  const params = new URLSearchParams();
+  if (formSearch) params.set("search", formSearch);
+  if (formPage && formPage !== "1") params.set("page", formPage);
+  if (formShowBlocked === "1") params.set("show_blocked", "1");
+  params.set("success", `"${extension_id}" ${action === "remove" ? "removed from list" : "added to " + list_type}`);
+  res.redirect(`/?${params.toString()}`);
 });
 
 // Extension detail page

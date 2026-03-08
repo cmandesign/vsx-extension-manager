@@ -4,27 +4,41 @@
   <div class="row mb-4">
     <div class="col">
       <h2><i class="bi bi-grid-3x3-gap"></i> Browse Extensions</h2>
+      <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+        <p class="text-muted mb-0">Current mode: <span class="badge <%= policyMode === 'blacklist' ? 'bg-warning text-dark' : 'bg-info' %>"><%= policyMode.toUpperCase() %></span></p>
+      <% } %>
     </div>
   </div>
+
+  <% if (typeof success !== 'undefined' && success) { %>
+  <div class="alert alert-success alert-dismissible fade show">
+    <%= success %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  <% } %>
 
   <%
     const _blockedSet = new Set(typeof blockedExtIds !== 'undefined' ? blockedExtIds : []);
     const _showBlocked = typeof showBlocked !== 'undefined' && showBlocked;
+    const _isAdmin = typeof isAdmin !== 'undefined' && isAdmin;
+    const _policyStatus = typeof policyStatus !== 'undefined' ? policyStatus : new Map();
   %>
 
   <form method="GET" action="/" class="row mb-4">
-    <div class="col-md-8 col-lg-6">
+    <div class="col-md-6 col-lg-5">
       <div class="input-group">
         <input type="text" class="form-control" name="search" placeholder="Search extensions..." value="<%= search %>">
         <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i> Search</button>
       </div>
     </div>
-    <div class="col-md-4 col-lg-6 d-flex align-items-center mt-2 mt-md-0">
+    <% if (_isAdmin) { %>
+    <div class="col-md-6 col-lg-7 d-flex align-items-center mt-2 mt-md-0">
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="showBlocked" name="show_blocked" value="1" <%= _showBlocked ? 'checked' : '' %> onchange="this.form.submit()">
         <label class="form-check-label" for="showBlocked">Show blocked extensions</label>
       </div>
     </div>
+    <% } %>
   </form>
 
   <% if (extensions.length === 0) { %>
@@ -47,37 +61,88 @@
         const stats = ext.statistics || [];
         const installs = stats.find(s => s.statisticName === 'install')?.value || 0;
         const rating = stats.find(s => s.statisticName === 'averagerating')?.value || 0;
+        const status = _isAdmin ? _policyStatus.get(extId) : undefined;
       %>
       <div class="col-md-6 col-lg-4">
-        <a href="/extension/<%= pub %>/<%= name %>" class="text-decoration-none">
-          <div class="card ext-card<%= isBlocked ? ' border-danger' : '' %>" style="<%= isBlocked ? 'opacity: 0.6;' : '' %>">
-            <div class="card-body d-flex">
-              <% if (iconUrl) { %>
-                <img src="<%= iconUrl %>" alt="" class="ext-icon me-3">
-              <% } else { %>
-                <div class="ext-icon me-3 bg-secondary d-flex align-items-center justify-content-center text-white rounded">
-                  <i class="bi bi-puzzle"></i>
-                </div>
-              <% } %>
-              <div class="overflow-hidden">
-                <h6 class="card-title mb-1 text-dark text-truncate">
-                  <%= displayName %>
-                  <% if (isBlocked) { %>
-                    <span class="badge bg-danger ms-1" style="font-size: 0.65em;">Blocked</span>
-                  <% } %>
-                </h6>
-                <small class="text-muted"><%= pub %></small>
-                <p class="card-text small text-muted mt-1 text-truncate"><%= shortDesc %></p>
-                <div class="d-flex gap-3 small text-muted">
-                  <span><i class="bi bi-download"></i> <%= Math.round(installs).toLocaleString() %></span>
-                  <% if (rating > 0) { %>
-                  <span><i class="bi bi-star-fill text-warning"></i> <%= rating.toFixed(1) %></span>
-                  <% } %>
+        <div class="card h-100<%= isBlocked ? ' border-danger' : '' %>" style="<%= isBlocked ? 'opacity: 0.6;' : '' %>">
+          <div class="card-body">
+            <a href="/extension/<%= pub %>/<%= name %>" class="text-decoration-none">
+              <div class="d-flex mb-2">
+                <% if (iconUrl) { %>
+                  <img src="<%= iconUrl %>" alt="" class="ext-icon me-3">
+                <% } else { %>
+                  <div class="ext-icon me-3 bg-secondary d-flex align-items-center justify-content-center text-white rounded">
+                    <i class="bi bi-puzzle"></i>
+                  </div>
+                <% } %>
+                <div class="overflow-hidden">
+                  <h6 class="card-title mb-1 text-dark text-truncate">
+                    <%= displayName %>
+                    <% if (isBlocked) { %>
+                      <span class="badge bg-danger ms-1" style="font-size: 0.65em;">Blocked</span>
+                    <% } %>
+                  </h6>
+                  <small class="text-muted"><%= pub %></small>
                 </div>
               </div>
+              <p class="card-text small text-muted text-truncate"><%= shortDesc %></p>
+              <div class="d-flex gap-3 small text-muted">
+                <span><i class="bi bi-download"></i> <%= Math.round(installs).toLocaleString() %></span>
+                <% if (rating > 0) { %>
+                <span><i class="bi bi-star-fill text-warning"></i> <%= rating.toFixed(1) %></span>
+                <% } %>
+              </div>
+            </a>
+
+            <% if (_isAdmin) { %>
+            <!-- Admin: Policy status + actions -->
+            <div class="mt-2 pt-2 border-top">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <% if (status === 'whitelist') { %>
+                  <span class="badge bg-success">Whitelisted</span>
+                <% } else if (status === 'blacklist') { %>
+                  <span class="badge bg-danger">Blacklisted</span>
+                <% } else { %>
+                  <span class="badge bg-secondary">No Policy</span>
+                <% } %>
+
+                <% if (status === 'whitelist' || status === 'blacklist') { %>
+                  <form method="POST" action="/extensions/policy" class="d-inline">
+                    <input type="hidden" name="extension_id" value="<%= extId %>">
+                    <input type="hidden" name="action" value="remove">
+                    <input type="hidden" name="search" value="<%= search %>">
+                    <input type="hidden" name="page" value="<%= page %>">
+                    <input type="hidden" name="show_blocked" value="<%= _showBlocked ? '1' : '0' %>">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1"><i class="bi bi-x-circle"></i> Remove</button>
+                  </form>
+                <% } %>
+                <% if (status !== 'whitelist') { %>
+                  <form method="POST" action="/extensions/policy" class="d-inline">
+                    <input type="hidden" name="extension_id" value="<%= extId %>">
+                    <input type="hidden" name="list_type" value="whitelist">
+                    <input type="hidden" name="action" value="add">
+                    <input type="hidden" name="search" value="<%= search %>">
+                    <input type="hidden" name="page" value="<%= page %>">
+                    <input type="hidden" name="show_blocked" value="<%= _showBlocked ? '1' : '0' %>">
+                    <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1"><i class="bi bi-check-circle"></i> Whitelist</button>
+                  </form>
+                <% } %>
+                <% if (status !== 'blacklist') { %>
+                  <form method="POST" action="/extensions/policy" class="d-inline">
+                    <input type="hidden" name="extension_id" value="<%= extId %>">
+                    <input type="hidden" name="list_type" value="blacklist">
+                    <input type="hidden" name="action" value="add">
+                    <input type="hidden" name="search" value="<%= search %>">
+                    <input type="hidden" name="page" value="<%= page %>">
+                    <input type="hidden" name="show_blocked" value="<%= _showBlocked ? '1' : '0' %>">
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-slash-circle"></i> Blacklist</button>
+                  </form>
+                <% } %>
+              </div>
             </div>
+            <% } %>
           </div>
-        </a>
+        </div>
       </div>
       <% }); %>
     </div>

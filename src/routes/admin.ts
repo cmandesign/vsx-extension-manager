@@ -2,11 +2,8 @@ import { Router } from "express";
 import { requireAdmin } from "../middleware/auth.js";
 import { listUsers, createUser, updateUser, deleteUser } from "../services/user-service.js";
 import { getTotalDownloads, getTopExtensions, getRecentDownloads, getDownloadsByDate } from "../services/stats-service.js";
-import { getPolicyMode, setPolicyMode, getPolicyList, addToList, removeFromList, removeFromListByExtensionId, getBulkListStatus } from "../services/policy-service.js";
+import { getPolicyMode, setPolicyMode, getPolicyList, addToList, removeFromList } from "../services/policy-service.js";
 import { getRules, createRule, updateRule, deleteRule } from "../services/rule-engine.js";
-import { queryExtensions } from "../services/marketplace-client.js";
-import { rewriteUrls, getBaseUrl } from "../services/url-rewriter.js";
-import type { ExtensionQueryResponse } from "../types/marketplace.js";
 
 const router = Router();
 
@@ -138,83 +135,6 @@ router.post("/admin/policy/list/:id/remove", async (req, res) => {
   const id = parseInt(req.params.id);
   await removeFromList(id);
   res.redirect("/admin/policy");
-});
-
-// --- Admin Extensions Browse ---
-
-router.get("/admin/extensions", async (req, res) => {
-  const search = (req.query.search as string) || "";
-  const page = parseInt(req.query.page as string) || 1;
-  const pageSize = 12;
-
-  let extensions: any[] = [];
-  let totalCount = 0;
-  const policyMode = await getPolicyMode();
-
-  try {
-    const queryBody = {
-      filters: [
-        {
-          criteria: [
-            { filterType: 8, value: "Microsoft.VisualStudio.Code" },
-            ...(search ? [{ filterType: 10, value: search }] : []),
-          ],
-          pageNumber: page,
-          pageSize,
-          sortBy: search ? 6 : 4,
-          sortOrder: 0,
-        },
-      ],
-      assetTypes: [],
-      flags: 0x200 | 0x2 | 0x1 | 0x80,
-    };
-
-    const { data } = await queryExtensions(queryBody);
-    const response = data as ExtensionQueryResponse;
-    const rewritten = rewriteUrls(response, getBaseUrl(req));
-
-    extensions = rewritten.results?.[0]?.extensions || [];
-    const metadata = rewritten.results?.[0]?.resultMetadata as Array<{ metadataType: string; metadataItems: Array<{ name: string; count: number }> }> || [];
-    const countMeta = metadata.find((m) => m.metadataType === "ResultCount");
-    totalCount = countMeta?.metadataItems?.[0]?.count || extensions.length;
-  } catch (err) {
-    console.error("Failed to fetch extensions:", (err as Error).message);
-  }
-
-  // Get policy status for all visible extensions
-  const extIds = extensions.map((ext: any) =>
-    `${ext.publisher?.publisherName || ""}.${ext.extensionName || ""}`.toLowerCase()
-  );
-  const policyStatus = await getBulkListStatus(extIds);
-
-  res.render("admin/extensions", {
-    extensions,
-    search,
-    page,
-    pageSize,
-    totalCount,
-    totalPages: Math.ceil(totalCount / pageSize),
-    policyMode,
-    policyStatus,
-    error: (req.query.error as string) || null,
-    success: (req.query.success as string) || null,
-  });
-});
-
-// Add/remove extension from policy list (from admin browse)
-router.post("/admin/extensions/policy", async (req, res) => {
-  const { extension_id, list_type, action } = req.body;
-  const search = (req.query.search as string) || "";
-  const page = (req.query.page as string) || "1";
-
-  if (action === "remove") {
-    await removeFromListByExtensionId(extension_id);
-  } else if (action === "add" && (list_type === "whitelist" || list_type === "blacklist")) {
-    await addToList(extension_id, list_type, res.locals.user?.id || null);
-  }
-
-  const redirect = `/admin/extensions?search=${encodeURIComponent(search)}&page=${page}&success=${encodeURIComponent(`"${extension_id}" ${action === 'remove' ? 'removed from list' : 'added to ' + list_type}`)}`;
-  res.redirect(redirect);
 });
 
 // --- Rule Management ---
