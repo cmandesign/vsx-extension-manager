@@ -1,15 +1,22 @@
+import type { Request } from "express";
 import type { ExtensionQueryResponse } from "../types/marketplace.js";
-import { config } from "../config.js";
 
-const VSASSETS_PATTERN = /https?:\/\/([^.]+)\.gallery\.vsassets\.io\/_apis\/public\/gallery\/publisher\/[^/]+\/extension\/[^/]+\/([^/]+)/g;
-const MARKETPLACE_PATTERN = /https?:\/\/marketplace\.visualstudio\.com\/_apis\/public\/gallery\/publisher\/[^/]+\/extension\/[^/]+\/([^/]+)/g;
-
-function buildProxyAssetUri(publisher: string, extension: string, version: string): string {
-  return `${config.publicBaseUrl}/assets/${publisher}/${extension}/${version}`;
+/**
+ * Derive the public-facing base URL from the incoming request so that
+ * rewritten URLs match the protocol, host and port the client actually uses.
+ */
+export function getBaseUrl(req: Request): string {
+  const proto = req.get("x-forwarded-proto") || req.protocol || "http";
+  const host = req.get("x-forwarded-host") || req.get("host") || "localhost";
+  return `${proto}://${host}`;
 }
 
-function rewriteSourceUrl(source: string, publisher: string, extension: string, version: string): string {
-  const proxyBase = buildProxyAssetUri(publisher, extension, version);
+function buildProxyAssetUri(baseUrl: string, publisher: string, extension: string, version: string): string {
+  return `${baseUrl}/assets/${publisher}/${extension}/${version}`;
+}
+
+function rewriteSourceUrl(baseUrl: string, source: string, publisher: string, extension: string, version: string, originalAssetUri?: string): string {
+  const proxyBase = buildProxyAssetUri(baseUrl, publisher, extension, version);
 
   // Match vsassets.io URLs with assetbyname suffix
   const vsassetsMatch = source.match(
@@ -27,10 +34,23 @@ function rewriteSourceUrl(source: string, publisher: string, extension: string, 
     return `${proxyBase}/assetbyname/${marketplaceMatch[1]}`;
   }
 
+  // Handle relative URLs (e.g. "assetbyname/..." or "/assetbyname/...")
+  const relativeMatch = source.match(/^\/?assetbyname\/(.+)/);
+  if (relativeMatch) {
+    return `${proxyBase}/assetbyname/${relativeMatch[1]}`;
+  }
+
+  // Handle other relative URLs by resolving against the original assetUri
+  if (originalAssetUri && !source.match(/^https?:\/\//)) {
+    const resolvedUrl = new URL(source, originalAssetUri.replace(/\/?$/, "/")).href;
+    // Try to rewrite the resolved absolute URL
+    return rewriteSourceUrl(baseUrl, resolvedUrl, publisher, extension, version);
+  }
+
   return source;
 }
 
-export function rewriteUrls(response: ExtensionQueryResponse): ExtensionQueryResponse {
+export function rewriteUrls(response: ExtensionQueryResponse, baseUrl: string): ExtensionQueryResponse {
   if (!response.results) return response;
 
   for (const result of response.results) {
@@ -44,7 +64,11 @@ export function rewriteUrls(response: ExtensionQueryResponse): ExtensionQueryRes
 
       for (const ver of ext.versions) {
         const version = ver.version;
-        const proxyUri = buildProxyAssetUri(publisher, extensionName, version);
+        const proxyUri = buildProxyAssetUri(baseUrl, publisher, extensionName, version);
+
+        // Preserve original assetUri before overwriting so relative file
+        // sources can be resolved against it
+        const originalAssetUri = ver.assetUri || ver.fallbackAssetUri;
 
         if (ver.assetUri) {
           ver.assetUri = proxyUri;
@@ -56,7 +80,7 @@ export function rewriteUrls(response: ExtensionQueryResponse): ExtensionQueryRes
         if (ver.files) {
           for (const file of ver.files) {
             if (file.source) {
-              file.source = rewriteSourceUrl(file.source, publisher, extensionName, version);
+              file.source = rewriteSourceUrl(baseUrl, file.source, publisher, extensionName, version, originalAssetUri);
             }
           }
         }
