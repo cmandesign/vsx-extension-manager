@@ -104,3 +104,29 @@ export async function getBulkListStatus(
   }
   return result;
 }
+
+export interface VersionListEntry {
+  extension_id: string;
+  version: string;
+  list_type: ListType;
+}
+
+export async function getBulkVersionListStatus(
+  extensionIds: string[]
+): Promise<Map<string, VersionListEntry[]>> {
+  if (extensionIds.length === 0) return new Map();
+
+  const lowerIds = extensionIds.map((id) => id.toLowerCase());
+  const placeholders = lowerIds.map(() => "?").join(",");
+  const [rows] = await getPool().query(
+    `SELECT extension_id, version, list_type FROM policy_list WHERE extension_id IN (${placeholders}) AND version IS NOT NULL`,
+    lowerIds
+  );
+  const result = new Map<string, VersionListEntry[]>();
+  for (const row of rows as VersionListEntry[]) {
+    const entries = result.get(row.extension_id) || [];
+    entries.push(row);
+    result.set(row.extension_id, entries);
+  }
+  return result;
+}

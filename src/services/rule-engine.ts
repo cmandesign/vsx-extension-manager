@@ -1,6 +1,6 @@
 import { getPool } from "../db/connection.js";
-import type { Extension } from "../types/marketplace.js";
-import type { PolicyMode, ListType } from "./policy-service.js";
+import type { Extension, ExtensionVersion } from "../types/marketplace.js";
+import type { PolicyMode, ListType, VersionListEntry } from "./policy-service.js";
 
 export type RuleField = "title" | "author" | "license" | "description" | "date_updated" | "age_hours";
 export type RuleOperator = "eq" | "neq" | "gt" | "lt" | "gte" | "lte" | "regex";
@@ -89,6 +89,7 @@ function extractField(ext: Extension, field: RuleField): string {
       return (ext as any).lastUpdated || "";
     }
     case "age_hours": {
+      // Extension-level age: use latest version date (for extension-level rule checks)
       const versions = ext.versions || [];
       const dateStr = versions.length > 0
         ? ((versions[0] as any).lastUpdated || (ext as any).lastUpdated || "")
@@ -193,15 +194,73 @@ export function isExtensionAllowed(
   return policyMode === "blacklist"; // blacklist mode: allow by default; whitelist mode: block by default
 }
 
+function getVersionAge(version: ExtensionVersion): number | null {
+  const dateStr = (version as any).lastUpdated || "";
+  if (!dateStr) return null;
+  const ageMs = Date.now() - new Date(dateStr).getTime();
+  if (isNaN(ageMs)) return null;
+  return ageMs / (1000 * 60 * 60);
+}
+
+function isVersionBlockedByAgeRules(version: ExtensionVersion, rules: PolicyRule[]): boolean {
+  const ageRules = rules.filter((r) => r.enabled && r.field === "age_hours");
+  for (const rule of ageRules) {
+    const ageHours = getVersionAge(version);
+    if (ageHours === null) continue;
+    const matches = evaluateCondition(ageHours.toString(), rule.operator, rule.value, true);
+    if (matches && rule.action === "block") return true;
+    if (matches && rule.action === "allow") return false;
+  }
+  return false;
+}
+
 export function filterExtensions(
   extensions: Extension[],
   rules: PolicyRule[],
   policyMode: PolicyMode,
-  policyListMap: Map<string, ListType>
+  policyListMap: Map<string, ListType>,
+  versionListMap?: Map<string, VersionListEntry[]>
 ): Extension[] {
-  return extensions.filter((ext) => {
+  const result: Extension[] = [];
+
+  for (const ext of extensions) {
     const extId = `${ext.publisher.publisherName}.${ext.extensionName}`.toLowerCase();
     const listEntry = policyListMap.get(extId) || null;
-    return isExtensionAllowed(ext, rules, policyMode, listEntry);
-  });
+
+    // Extension-level check (skip age_hours here - handled per-version)
+    if (!isExtensionAllowed(ext, rules, policyMode, listEntry)) {
+      continue;
+    }
+
+    // Version-level filtering
+    const versionEntries = versionListMap?.get(extId) || [];
+    let versions = ext.versions || [];
+
+    if (versionEntries.length > 0 || rules.some((r) => r.enabled && r.field === "age_hours")) {
+      versions = versions.filter((v) => {
+        // Check version-level policy list
+        const vEntry = versionEntries.find((e) => e.version === v.version);
+        if (vEntry) {
+          if (vEntry.list_type === "blacklist") return false;
+          if (vEntry.list_type === "whitelist") return true;
+        }
+
+        // Check age rules per version
+        if (isVersionBlockedByAgeRules(v, rules)) return false;
+
+        return true;
+      });
+
+      // If all versions were filtered out, skip the extension entirely
+      if (versions.length === 0) continue;
+
+      // Return a shallow copy with filtered versions
+      result.push({ ...ext, versions });
+      continue;
+    }
+
+    result.push(ext);
+  }
+
+  return result;
 }
