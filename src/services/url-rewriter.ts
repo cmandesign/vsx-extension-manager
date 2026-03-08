@@ -8,7 +8,7 @@ function buildProxyAssetUri(publisher: string, extension: string, version: strin
   return `${config.publicBaseUrl}/assets/${publisher}/${extension}/${version}`;
 }
 
-function rewriteSourceUrl(source: string, publisher: string, extension: string, version: string): string {
+function rewriteSourceUrl(source: string, publisher: string, extension: string, version: string, originalAssetUri?: string): string {
   const proxyBase = buildProxyAssetUri(publisher, extension, version);
 
   // Match vsassets.io URLs with assetbyname suffix
@@ -25,6 +25,19 @@ function rewriteSourceUrl(source: string, publisher: string, extension: string, 
   );
   if (marketplaceMatch) {
     return `${proxyBase}/assetbyname/${marketplaceMatch[1]}`;
+  }
+
+  // Handle relative URLs (e.g. "assetbyname/..." or "/assetbyname/...")
+  const relativeMatch = source.match(/^\/?assetbyname\/(.+)/);
+  if (relativeMatch) {
+    return `${proxyBase}/assetbyname/${relativeMatch[1]}`;
+  }
+
+  // Handle other relative URLs by resolving against the original assetUri
+  if (originalAssetUri && !source.match(/^https?:\/\//)) {
+    const resolvedUrl = new URL(source, originalAssetUri.replace(/\/?$/, "/")).href;
+    // Try to rewrite the resolved absolute URL
+    return rewriteSourceUrl(resolvedUrl, publisher, extension, version);
   }
 
   return source;
@@ -46,6 +59,10 @@ export function rewriteUrls(response: ExtensionQueryResponse): ExtensionQueryRes
         const version = ver.version;
         const proxyUri = buildProxyAssetUri(publisher, extensionName, version);
 
+        // Preserve original assetUri before overwriting so relative file
+        // sources can be resolved against it
+        const originalAssetUri = ver.assetUri || ver.fallbackAssetUri;
+
         if (ver.assetUri) {
           ver.assetUri = proxyUri;
         }
@@ -56,7 +73,7 @@ export function rewriteUrls(response: ExtensionQueryResponse): ExtensionQueryRes
         if (ver.files) {
           for (const file of ver.files) {
             if (file.source) {
-              file.source = rewriteSourceUrl(file.source, publisher, extensionName, version);
+              file.source = rewriteSourceUrl(file.source, publisher, extensionName, version, originalAssetUri);
             }
           }
         }
