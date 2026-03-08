@@ -9,8 +9,24 @@ const router = Router();
 router.get("/assets/:publisher/:extension/:version/assetbyname/:assetType", async (req, res, next) => {
   try {
     const { publisher, extension, version, assetType } = req.params;
+    const qs = new URLSearchParams(req.query as Record<string, string>).toString();
 
-    const upstreamUrl = `https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${extension}/${version}/assetbyname/${assetType}`;
+    const upstreamUrl = `https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${extension}/${version}/assetbyname/${assetType}${qs ? `?${qs}` : ""}`;
+    console.log(`  ↳ Fetching upstream: ${upstreamUrl}`);
+
+    await streamAsset(upstreamUrl, res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// VS Code constructs URLs as {assetUri}/{assetType} (without "assetbyname/")
+router.get("/assets/:publisher/:extension/:version/:assetType", async (req, res, next) => {
+  try {
+    const { publisher, extension, version, assetType } = req.params;
+    const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+
+    const upstreamUrl = `https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${extension}/${version}/assetbyname/${assetType}${qs ? `?${qs}` : ""}`;
     console.log(`  ↳ Fetching upstream: ${upstreamUrl}`);
 
     await streamAsset(upstreamUrl, res);
@@ -25,7 +41,8 @@ router.get(
   async (req, res, next) => {
     try {
       const { publisher, extension, version } = req.params;
-      const upstreamUrl = `${config.upstreamUrl}/_apis/public/gallery/publishers/${publisher}/vsextensions/${extension}/${version}/vspackage`;
+      const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+      const upstreamUrl = `${config.upstreamUrl}/_apis/public/gallery/publishers/${publisher}/vsextensions/${extension}/${version}/vspackage${qs ? `?${qs}` : ""}`;
       console.log(`  ↳ Fetching upstream: ${upstreamUrl}`);
 
       await streamAsset(upstreamUrl, res);
