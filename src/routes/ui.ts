@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { queryExtensions } from "../services/marketplace-client.js";
-import { rewriteUrls } from "../services/url-rewriter.js";
+import { rewriteUrls, getBaseUrl } from "../services/url-rewriter.js";
 import type { ExtensionQueryResponse } from "../types/marketplace.js";
 
 const router = Router();
@@ -35,7 +35,7 @@ router.get("/", async (req, res) => {
 
       const { data } = await queryExtensions(queryBody);
       const response = data as ExtensionQueryResponse;
-      const rewritten = rewriteUrls(response);
+      const rewritten = rewriteUrls(response, getBaseUrl(req));
 
       extensions = rewritten.results?.[0]?.extensions || [];
       const metadata = rewritten.results?.[0]?.resultMetadata as Array<{ metadataType: string; metadataItems: Array<{ name: string; count: number }> }> || [];
@@ -79,7 +79,7 @@ router.get("/extension/:publisher/:name", async (req, res) => {
 
     const { data } = await queryExtensions(queryBody);
     const response = data as ExtensionQueryResponse;
-    const rewritten = rewriteUrls(response);
+    const rewritten = rewriteUrls(response, getBaseUrl(req));
     const extension = rewritten.results?.[0]?.extensions?.[0];
 
     if (!extension) {
