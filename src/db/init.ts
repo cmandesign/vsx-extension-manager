@@ -95,10 +95,12 @@ export async function initDatabase(): Promise<boolean> {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS policy_list (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        extension_id VARCHAR(512) NOT NULL UNIQUE,
+        extension_id VARCHAR(512) NOT NULL,
+        version VARCHAR(100) NULL DEFAULT NULL,
         list_type ENUM('whitelist', 'blacklist') NOT NULL,
         added_by INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_ext_version (extension_id, version),
         FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE SET NULL
       )
     `);
@@ -116,6 +118,24 @@ export async function initDatabase(): Promise<boolean> {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Schema migrations for existing databases
+    try {
+      await pool.query(
+        `ALTER TABLE policy_rules MODIFY COLUMN field ENUM('title', 'author', 'license', 'description', 'date_updated', 'age_hours') NOT NULL`
+      );
+    } catch { /* column already has correct type */ }
+
+    try {
+      await pool.query(`ALTER TABLE policy_list ADD COLUMN version VARCHAR(100) NULL DEFAULT NULL AFTER extension_id`);
+    } catch { /* column already exists */ }
+
+    try {
+      await pool.query(`ALTER TABLE policy_list DROP INDEX extension_id`);
+    } catch { /* index doesn't exist */ }
+    try {
+      await pool.query(`ALTER TABLE policy_list ADD UNIQUE KEY uq_ext_version (extension_id, version)`);
+    } catch { /* key already exists */ }
 
     // Seed default admin if no users exist
     const [rows] = await pool.query("SELECT COUNT(*) as count FROM users");

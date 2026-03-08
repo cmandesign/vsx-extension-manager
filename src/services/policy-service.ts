@@ -6,6 +6,7 @@ export type ListType = "whitelist" | "blacklist";
 export interface PolicyListEntry {
   id: number;
   extension_id: string;
+  version: string | null;
   list_type: ListType;
   added_by: number | null;
   username?: string;
@@ -40,13 +41,14 @@ export async function getPolicyList(): Promise<PolicyListEntry[]> {
 export async function addToList(
   extensionId: string,
   listType: ListType,
-  userId: number | null
+  userId: number | null,
+  version: string | null = null
 ): Promise<void> {
   await getPool().query(
-    `INSERT INTO policy_list (extension_id, list_type, added_by)
-     VALUES (?, ?, ?)
+    `INSERT INTO policy_list (extension_id, version, list_type, added_by)
+     VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE list_type = VALUES(list_type), added_by = VALUES(added_by)`,
-    [extensionId.toLowerCase(), listType, userId]
+    [extensionId.toLowerCase(), version || null, listType, userId]
   );
 }
 
@@ -54,17 +56,35 @@ export async function removeFromList(id: number): Promise<void> {
   await getPool().query("DELETE FROM policy_list WHERE id = ?", [id]);
 }
 
-export async function removeFromListByExtensionId(extensionId: string): Promise<void> {
-  await getPool().query("DELETE FROM policy_list WHERE extension_id = ?", [extensionId.toLowerCase()]);
+export async function removeFromListByExtensionId(extensionId: string, version: string | null = null): Promise<void> {
+  if (version) {
+    await getPool().query(
+      "DELETE FROM policy_list WHERE extension_id = ? AND version = ?",
+      [extensionId.toLowerCase(), version]
+    );
+  } else {
+    await getPool().query(
+      "DELETE FROM policy_list WHERE extension_id = ? AND version IS NULL",
+      [extensionId.toLowerCase()]
+    );
+  }
 }
 
 export async function getListEntry(extensionId: string): Promise<PolicyListEntry | null> {
   const [rows] = await getPool().query(
-    "SELECT * FROM policy_list WHERE extension_id = ?",
+    "SELECT * FROM policy_list WHERE extension_id = ? AND version IS NULL",
     [extensionId.toLowerCase()]
   );
   const result = rows as PolicyListEntry[];
   return result.length > 0 ? result[0] : null;
+}
+
+export async function getVersionListEntries(extensionId: string): Promise<PolicyListEntry[]> {
+  const [rows] = await getPool().query(
+    "SELECT * FROM policy_list WHERE extension_id = ? ORDER BY version",
+    [extensionId.toLowerCase()]
+  );
+  return rows as PolicyListEntry[];
 }
 
 export async function getBulkListStatus(
@@ -75,7 +95,7 @@ export async function getBulkListStatus(
   const lowerIds = extensionIds.map((id) => id.toLowerCase());
   const placeholders = lowerIds.map(() => "?").join(",");
   const [rows] = await getPool().query(
-    `SELECT extension_id, list_type FROM policy_list WHERE extension_id IN (${placeholders})`,
+    `SELECT extension_id, list_type FROM policy_list WHERE extension_id IN (${placeholders}) AND version IS NULL`,
     lowerIds
   );
   const result = new Map<string, ListType>();

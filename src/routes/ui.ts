@@ -2,8 +2,8 @@ import { Router } from "express";
 import { queryExtensions } from "../services/marketplace-client.js";
 import { rewriteUrls, getBaseUrl } from "../services/url-rewriter.js";
 import { dbAvailable } from "../db/connection.js";
-import { getPolicyMode, getBulkListStatus, addToList, removeFromListByExtensionId } from "../services/policy-service.js";
-import type { ListType } from "../services/policy-service.js";
+import { getPolicyMode, getBulkListStatus, addToList, removeFromListByExtensionId, getListEntry, getVersionListEntries } from "../services/policy-service.js";
+import type { ListType, PolicyListEntry } from "../services/policy-service.js";
 import { getRules, filterExtensions, isExtensionAllowed } from "../services/rule-engine.js";
 import type { Extension, ExtensionQueryResponse } from "../types/marketplace.js";
 
@@ -158,26 +158,50 @@ router.get("/extension/:publisher/:name", async (req, res) => {
       return;
     }
 
+    const isAdmin = res.locals.user?.role === "admin";
+    let policyEntry: PolicyListEntry | null = null;
+    let versionEntries: PolicyListEntry[] = [];
+    let policyMode = "blacklist";
+    let isBlocked = false;
+
     // Check if this extension is allowed by policy
     if (dbAvailable) {
       try {
-        const [policyMode, rules] = await Promise.all([getPolicyMode(), getRules()]);
+        const [mode, rules] = await Promise.all([getPolicyMode(), getRules()]);
+        policyMode = mode;
         const extId = `${extension.publisher.publisherName}.${extension.extensionName}`.toLowerCase();
         const policyListMap = await getBulkListStatus([extId]);
-        const allowed = filterExtensions([extension], rules, policyMode, policyListMap);
+        const allowed = filterExtensions([extension], rules, mode, policyListMap);
+
+        if (isAdmin) {
+          policyEntry = await getListEntry(extId);
+          versionEntries = await getVersionListEntries(extId);
+        }
+
         if (allowed.length === 0) {
-          res.status(403).render("layout", {
-            title: "Blocked",
-            body: "<div class='container mt-5'><h2>This extension is blocked by policy</h2><p><a href='/'>Back to browse</a></p></div>",
-          });
-          return;
+          isBlocked = true;
+          if (!isAdmin) {
+            res.status(403).render("layout", {
+              title: "Blocked",
+              body: "<div class='container mt-5'><h2>This extension is blocked by policy</h2><p><a href='/'>Back to browse</a></p></div>",
+            });
+            return;
+          }
         }
       } catch (err) {
         console.error("Policy check failed, allowing access:", (err as Error).message);
       }
     }
 
-    res.render("extension", { extension });
+    res.render("extension", {
+      extension,
+      isAdmin,
+      policyEntry,
+      versionEntries,
+      policyMode,
+      isBlocked,
+      success: (req.query.success as string) || null,
+    });
   } catch (err) {
     console.error("Failed to fetch extension:", (err as Error).message);
     res.status(500).render("layout", {
@@ -185,6 +209,30 @@ router.get("/extension/:publisher/:name", async (req, res) => {
       body: "<div class='container mt-5'><h2>Failed to load extension</h2></div>",
     });
   }
+});
+
+// Handle policy actions from extension detail page (admin only)
+router.post("/extension/:publisher/:name/policy", async (req, res) => {
+  const { publisher, name } = req.params;
+  if (res.locals.user?.role !== "admin") {
+    res.redirect(`/extension/${publisher}/${name}`);
+    return;
+  }
+
+  const { list_type, action, version } = req.body;
+  const extId = `${publisher}.${name}`.toLowerCase();
+  const ver = version || null;
+
+  if (action === "remove") {
+    await removeFromListByExtensionId(extId, ver);
+  } else if (action === "add" && (list_type === "whitelist" || list_type === "blacklist")) {
+    await addToList(extId, list_type, res.locals.user?.id || null, ver);
+  }
+
+  const msg = action === "remove"
+    ? `${ver ? "Version " + ver : "Extension"} removed from list`
+    : `${ver ? "Version " + ver : "Extension"} added to ${list_type}`;
+  res.redirect(`/extension/${publisher}/${name}?success=${encodeURIComponent(msg)}`);
 });
 
 export default router;

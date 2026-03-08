@@ -82,6 +82,7 @@
           <thead>
             <tr>
               <th>Extension ID</th>
+              <th>Version</th>
               <th>List</th>
               <th>Added By</th>
               <th>Date</th>
@@ -92,6 +93,7 @@
             <% policyList.forEach(function(entry) { %>
             <tr>
               <td><code><%= entry.extension_id %></code></td>
+              <td><%= entry.version || '<span class="text-muted">All</span>' %></td>
               <td>
                 <span class="badge <%= entry.list_type === 'whitelist' ? 'bg-success' : 'bg-danger' %>">
                   <%= entry.list_type %>

@@ -39,6 +39,19 @@
 %>
 
 <div class="container mt-4">
+  <% if (typeof success !== 'undefined' && success) { %>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <%= success %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  <% } %>
+
+  <% if (typeof isBlocked !== 'undefined' && isBlocked && typeof isAdmin !== 'undefined' && isAdmin) { %>
+  <div class="alert alert-danger">
+    <i class="bi bi-shield-x"></i> <strong>This extension is blocked by policy.</strong> You are viewing it as an admin.
+  </div>
+  <% } %>
+
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="/">Browse</a></li>
@@ -73,7 +86,7 @@
             <% } %>
           </div>
 
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 flex-wrap">
             <% if (vsixUrl) { %>
               <a href="<%= vsixUrl %>" class="btn btn-primary">
                 <i class="bi bi-download"></i> Download VSIX
@@ -83,6 +96,38 @@
               <i class="bi bi-clipboard"></i> Copy Install Command
             </button>
           </div>
+
+          <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+          <hr>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <strong class="me-2"><i class="bi bi-shield-check"></i> Policy:</strong>
+            <% const extId = (pub + '.' + name).toLowerCase(); %>
+            <% if (typeof policyEntry !== 'undefined' && policyEntry) { %>
+              <span class="badge <%= policyEntry.list_type === 'whitelist' ? 'bg-success' : 'bg-danger' %> me-2">
+                <%= policyEntry.list_type === 'whitelist' ? 'Whitelisted' : 'Blacklisted' %>
+              </span>
+              <form method="POST" action="/extension/<%= pub %>/<%= name %>/policy" class="d-inline">
+                <input type="hidden" name="extension_id" value="<%= extId %>">
+                <input type="hidden" name="action" value="remove">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle"></i> Remove from List</button>
+              </form>
+            <% } else { %>
+              <span class="badge bg-secondary me-2">No Policy</span>
+            <% } %>
+            <form method="POST" action="/extension/<%= pub %>/<%= name %>/policy" class="d-inline">
+              <input type="hidden" name="extension_id" value="<%= extId %>">
+              <input type="hidden" name="action" value="add">
+              <input type="hidden" name="list_type" value="whitelist">
+              <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle"></i> Whitelist</button>
+            </form>
+            <form method="POST" action="/extension/<%= pub %>/<%= name %>/policy" class="d-inline">
+              <input type="hidden" name="extension_id" value="<%= extId %>">
+              <input type="hidden" name="action" value="add">
+              <input type="hidden" name="list_type" value="blacklist">
+              <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-x-circle"></i> Blacklist</button>
+            </form>
+          </div>
+          <% } %>
         </div>
       </div>
     </div>
@@ -165,13 +210,57 @@
           <tr>
             <th>Version</th>
             <th>Last Updated</th>
+            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+            <th>Policy</th>
+            <th>Actions</th>
+            <% } %>
           </tr>
         </thead>
         <tbody>
           <% (extension.versions || []).slice(0, 10).forEach(function(v) { %>
+          <%
+            let versionPolicyEntry = null;
+            if (typeof versionEntries !== 'undefined' && versionEntries) {
+              versionPolicyEntry = versionEntries.find(function(e) { return e.version === v.version; }) || null;
+            }
+          %>
           <tr>
             <td><%= v.version %></td>
             <td><%= v.lastUpdated ? new Date(v.lastUpdated).toLocaleDateString() : 'N/A' %></td>
+            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+            <td>
+              <% if (versionPolicyEntry) { %>
+                <span class="badge <%= versionPolicyEntry.list_type === 'whitelist' ? 'bg-success' : 'bg-danger' %>">
+                  <%= versionPolicyEntry.list_type %>
+                </span>
+              <% } else { %>
+                <span class="text-muted">-</span>
+              <% } %>
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <% if (versionPolicyEntry) { %>
+                  <form method="POST" action="/extension/<%= pub %>/<%= name %>/policy" class="d-inline">
+                    <input type="hidden" name="action" value="remove">
+                    <input type="hidden" name="version" value="<%= v.version %>">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Remove from list"><i class="bi bi-x-circle"></i></button>
+                  </form>
+                <% } %>
+                <form method="POST" action="/extension/<%= pub %>/<%= name %>/policy" class="d-inline">
+                  <input type="hidden" name="action" value="add">
+                  <input type="hidden" name="list_type" value="whitelist">
+                  <input type="hidden" name="version" value="<%= v.version %>">
+                  <button type="submit" class="btn btn-sm btn-success" title="Whitelist this version"><i class="bi bi-check-circle"></i></button>
+                </form>
+                <form method="POST" action="/extension/<%= pub %>/<%= name %>/policy" class="d-inline">
+                  <input type="hidden" name="action" value="add">
+                  <input type="hidden" name="list_type" value="blacklist">
+                  <input type="hidden" name="version" value="<%= v.version %>">
+                  <button type="submit" class="btn btn-sm btn-danger" title="Blacklist this version"><i class="bi bi-x-circle"></i></button>
+                </form>
+              </div>
+            </td>
+            <% } %>
           </tr>
           <% }); %>
         </tbody>
