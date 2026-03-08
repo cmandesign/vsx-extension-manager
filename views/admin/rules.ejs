@@ -1,0 +1,201 @@
+<%- include('../layout', { title: 'Policy Rules' }) %>
+
+<div class="container mt-4">
+  <h2><i class="bi bi-funnel"></i> Policy Rules</h2>
+  <p class="text-muted">Rules are evaluated by priority (highest first). First matching rule wins.</p>
+
+  <% if (typeof error !== 'undefined' && error) { %>
+  <div class="alert alert-danger mt-3"><%= error %></div>
+  <% } %>
+  <% if (typeof success !== 'undefined' && success) { %>
+  <div class="alert alert-success mt-3"><%= success %></div>
+  <% } %>
+
+  <!-- Add Rule Form -->
+  <div class="card mt-3">
+    <div class="card-header"><h5 class="mb-0">Add Rule</h5></div>
+    <div class="card-body">
+      <form method="POST" action="/admin/rules">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2">
+            <label for="field" class="form-label">Field</label>
+            <select class="form-select" id="field" name="field" required>
+              <option value="title">Title</option>
+              <option value="author">Author</option>
+              <option value="license">License</option>
+              <option value="description">Description</option>
+              <option value="date_updated">Date Updated</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label for="operator" class="form-label">Operator</label>
+            <select class="form-select" id="operator" name="operator" required>
+              <option value="eq">== (equals)</option>
+              <option value="neq">!= (not equals)</option>
+              <option value="gt">&gt; (greater than)</option>
+              <option value="lt">&lt; (less than)</option>
+              <option value="gte">&gt;= (greater or equal)</option>
+              <option value="lte">&lt;= (less or equal)</option>
+              <option value="regex">regex</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label for="value" class="form-label">Value</label>
+            <input type="text" class="form-control" id="value" name="value" placeholder="Value to match" required>
+          </div>
+          <div class="col-md-1">
+            <label for="action" class="form-label">Action</label>
+            <select class="form-select" id="action" name="action" required>
+              <option value="block">Block</option>
+              <option value="allow">Allow</option>
+            </select>
+          </div>
+          <div class="col-md-1">
+            <label for="priority" class="form-label">Priority</label>
+            <input type="number" class="form-control" id="priority" name="priority" value="0" required>
+          </div>
+          <div class="col-md-2">
+            <div class="form-check mt-4">
+              <input class="form-check-input" type="checkbox" id="override_policy" name="override_policy" value="1">
+              <label class="form-check-label" for="override_policy">Override global policy</label>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-circle"></i> Add Rule</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Rules Table -->
+  <div class="card mt-3">
+    <div class="card-header"><h5 class="mb-0">Active Rules (<%= rules.length %>)</h5></div>
+    <div class="card-body">
+      <% if (rules.length === 0) { %>
+        <p class="text-muted text-center mb-0">No rules defined yet.</p>
+      <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Priority</th>
+              <th>Field</th>
+              <th>Operator</th>
+              <th>Value</th>
+              <th>Action</th>
+              <th>Override</th>
+              <th>Enabled</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rules.forEach(function(rule) { %>
+            <tr>
+              <td><%= rule.priority %></td>
+              <td><%= rule.field %></td>
+              <td>
+                <code><%= rule.operator === 'eq' ? '==' : rule.operator === 'neq' ? '!=' : rule.operator === 'gt' ? '>' : rule.operator === 'lt' ? '<' : rule.operator === 'gte' ? '>=' : rule.operator === 'lte' ? '<=' : 'regex' %></code>
+              </td>
+              <td><code><%= rule.value %></code></td>
+              <td>
+                <span class="badge <%= rule.action === 'allow' ? 'bg-success' : 'bg-danger' %>"><%= rule.action %></span>
+              </td>
+              <td>
+                <% if (rule.override_policy) { %>
+                  <span class="badge bg-warning text-dark">Yes</span>
+                <% } else { %>
+                  <span class="text-muted">No</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (rule.enabled) { %>
+                  <span class="badge bg-success">On</span>
+                <% } else { %>
+                  <span class="badge bg-secondary">Off</span>
+                <% } %>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editRuleModal<%= rule.id %>">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="POST" action="/admin/rules/<%= rule.id %>/delete" class="d-inline" onsubmit="return confirm('Delete this rule?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+
+                <!-- Edit Modal -->
+                <div class="modal fade" id="editRuleModal<%= rule.id %>" tabindex="-1">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <form method="POST" action="/admin/rules/<%= rule.id %>">
+                        <div class="modal-header">
+                          <h5 class="modal-title">Edit Rule #<%= rule.id %></h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                          <div class="mb-3">
+                            <label class="form-label">Field</label>
+                            <select class="form-select" name="field">
+                              <option value="title" <%= rule.field === 'title' ? 'selected' : '' %>>Title</option>
+                              <option value="author" <%= rule.field === 'author' ? 'selected' : '' %>>Author</option>
+                              <option value="license" <%= rule.field === 'license' ? 'selected' : '' %>>License</option>
+                              <option value="description" <%= rule.field === 'description' ? 'selected' : '' %>>Description</option>
+                              <option value="date_updated" <%= rule.field === 'date_updated' ? 'selected' : '' %>>Date Updated</option>
+                            </select>
+                          </div>
+                          <div class="mb-3">
+                            <label class="form-label">Operator</label>
+                            <select class="form-select" name="operator">
+                              <option value="eq" <%= rule.operator === 'eq' ? 'selected' : '' %>>== (equals)</option>
+                              <option value="neq" <%= rule.operator === 'neq' ? 'selected' : '' %>>!= (not equals)</option>
+                              <option value="gt" <%= rule.operator === 'gt' ? 'selected' : '' %>>&#62; (greater than)</option>
+                              <option value="lt" <%= rule.operator === 'lt' ? 'selected' : '' %>>&#60; (less than)</option>
+                              <option value="gte" <%= rule.operator === 'gte' ? 'selected' : '' %>>&#62;= (greater or equal)</option>
+                              <option value="lte" <%= rule.operator === 'lte' ? 'selected' : '' %>>&#60;= (less or equal)</option>
+                              <option value="regex" <%= rule.operator === 'regex' ? 'selected' : '' %>>regex</option>
+                            </select>
+                          </div>
+                          <div class="mb-3">
+                            <label class="form-label">Value</label>
+                            <input type="text" class="form-control" name="value" value="<%= rule.value %>">
+                          </div>
+                          <div class="mb-3">
+                            <label class="form-label">Action</label>
+                            <select class="form-select" name="action">
+                              <option value="allow" <%= rule.action === 'allow' ? 'selected' : '' %>>Allow</option>
+                              <option value="block" <%= rule.action === 'block' ? 'selected' : '' %>>Block</option>
+                            </select>
+                          </div>
+                          <div class="mb-3">
+                            <label class="form-label">Priority</label>
+                            <input type="number" class="form-control" name="priority" value="<%= rule.priority %>">
+                          </div>
+                          <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="override_policy" value="1" <%= rule.override_policy ? 'checked' : '' %>>
+                            <label class="form-check-label">Override global policy</label>
+                          </div>
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="enabled" value="1" <%= rule.enabled ? 'checked' : '' %>>
+                            <label class="form-check-label">Enabled</label>
+                          </div>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../footer') %>

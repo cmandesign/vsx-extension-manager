@@ -80,6 +80,43 @@ export async function initDatabase(): Promise<boolean> {
       )
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS policy_config (
+        id INT PRIMARY KEY DEFAULT 1,
+        mode ENUM('blacklist', 'whitelist') NOT NULL DEFAULT 'blacklist',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(
+      `INSERT IGNORE INTO policy_config (id, mode) VALUES (1, 'blacklist')`
+    );
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS policy_list (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        extension_id VARCHAR(512) NOT NULL UNIQUE,
+        list_type ENUM('whitelist', 'blacklist') NOT NULL,
+        added_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS policy_rules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        field ENUM('title', 'author', 'license', 'description', 'date_updated') NOT NULL,
+        operator ENUM('eq', 'neq', 'gt', 'lt', 'gte', 'lte', 'regex') NOT NULL,
+        value VARCHAR(512) NOT NULL,
+        action ENUM('allow', 'block') NOT NULL,
+        override_policy BOOLEAN NOT NULL DEFAULT FALSE,
+        priority INT NOT NULL DEFAULT 0,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Seed default admin if no users exist
     const [rows] = await pool.query("SELECT COUNT(*) as count FROM users");
     const count = (rows as Array<{ count: number }>)[0].count;
