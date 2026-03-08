@@ -21,6 +21,21 @@
   // VSIX download link
   const vsixFile = version?.files?.find(f => f.assetType === 'Microsoft.VisualStudio.Services.VSIXPackage');
   const vsixUrl = vsixFile?.source || '';
+
+  // Extract additional metadata
+  const categories = extension.categories || [];
+  const tags = extension.tags || [];
+  const lastUpdated = version?.lastUpdated ? new Date(version.lastUpdated).toLocaleDateString() : null;
+
+  // Extract properties from version
+  const versionProps = version?.properties || [];
+  const getVersionProp = (key) => {
+    const prop = versionProps.find(p => p.key === key);
+    return prop ? prop.value : null;
+  };
+  const repoUrl = getVersionProp('Microsoft.VisualStudio.Services.Links.Source')
+    || getVersionProp('Microsoft.VisualStudio.Services.Links.GitHub');
+  const licenseUrl = getVersionProp('Microsoft.VisualStudio.Services.Links.License');
 %>
 
 <div class="container mt-4">
@@ -70,6 +85,67 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Description / README -->
+  <% if (readmeFile?.source) { %>
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">Description</h5>
+    </div>
+    <div class="card-body">
+      <div id="readme-content">
+        <p class="text-muted">Loading description...</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      fetch('<%= readmeFile.source %>')
+        .then(function(r) { return r.text(); })
+        .then(function(text) {
+          var el = document.getElementById('readme-content');
+          // Check if it looks like HTML
+          if (text.trim().startsWith('<')) {
+            el.innerHTML = text;
+          } else {
+            el.innerHTML = '<pre style="white-space: pre-wrap; word-break: break-word;">' +
+              text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
+          }
+        })
+        .catch(function() {
+          document.getElementById('readme-content').innerHTML = '<p class="text-muted">Could not load description.</p>';
+        });
+    })();
+  </script>
+  <% } %>
+
+  <!-- Extension Details -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">Details</h5>
+    </div>
+    <div class="card-body">
+      <table class="table table-sm mb-0">
+        <tbody>
+          <% if (lastUpdated) { %>
+          <tr><th style="width:150px">Last Updated</th><td><%= lastUpdated %></td></tr>
+          <% } %>
+          <% if (categories.length > 0) { %>
+          <tr><th>Categories</th><td><% categories.forEach(function(c) { %><span class="badge bg-primary me-1"><%= c %></span><% }); %></td></tr>
+          <% } %>
+          <% if (tags.length > 0) { %>
+          <tr><th>Tags</th><td><% tags.forEach(function(t) { %><span class="badge bg-secondary me-1"><%= t %></span><% }); %></td></tr>
+          <% } %>
+          <% if (repoUrl) { %>
+          <tr><th>Repository</th><td><a href="<%= repoUrl %>" target="_blank"><%= repoUrl %></a></td></tr>
+          <% } %>
+          <% if (licenseUrl) { %>
+          <tr><th>License</th><td><a href="<%= licenseUrl %>" target="_blank">View License</a></td></tr>
+          <% } %>
+        </tbody>
+      </table>
     </div>
   </div>
 

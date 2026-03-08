@@ -3,7 +3,7 @@ import { queryExtensions } from "../services/marketplace-client.js";
 import { rewriteUrls, getBaseUrl } from "../services/url-rewriter.js";
 import { dbAvailable } from "../db/connection.js";
 import { getPolicyMode, getBulkListStatus } from "../services/policy-service.js";
-import { getRules, filterExtensions } from "../services/rule-engine.js";
+import { getRules, filterExtensions, isExtensionAllowed } from "../services/rule-engine.js";
 import type { Extension, ExtensionQueryResponse } from "../types/marketplace.js";
 
 const router = Router();
@@ -12,10 +12,12 @@ const router = Router();
 router.get("/", async (req, res) => {
   const search = (req.query.search as string) || "";
   const page = parseInt(req.query.page as string) || 1;
+  const showBlocked = req.query.show_blocked === "1";
   const pageSize = 12;
 
   let extensions: Extension[] = [];
   let totalCount = 0;
+  const blockedExtIds = new Set<string>();
 
   try {
     if (search || page >= 1) {
@@ -53,8 +55,20 @@ router.get("/", async (req, res) => {
             `${ext.publisher.publisherName}.${ext.extensionName}`.toLowerCase()
           );
           const policyListMap = await getBulkListStatus(extIds);
-          extensions = filterExtensions(extensions, rules, policyMode, policyListMap);
-          totalCount = extensions.length;
+
+          // Identify blocked extensions
+          for (const ext of extensions) {
+            const extId = `${ext.publisher.publisherName}.${ext.extensionName}`.toLowerCase();
+            const listEntry = policyListMap.get(extId) || null;
+            if (!isExtensionAllowed(ext, rules, policyMode, listEntry)) {
+              blockedExtIds.add(extId);
+            }
+          }
+
+          if (!showBlocked) {
+            extensions = filterExtensions(extensions, rules, policyMode, policyListMap);
+            totalCount = extensions.length;
+          }
         } catch (err) {
           console.error("Policy filtering failed, showing unfiltered:", (err as Error).message);
         }
@@ -71,6 +85,8 @@ router.get("/", async (req, res) => {
     pageSize,
     totalCount,
     totalPages: Math.ceil(totalCount / pageSize),
+    showBlocked,
+    blockedExtIds: Array.from(blockedExtIds),
   });
 });
 

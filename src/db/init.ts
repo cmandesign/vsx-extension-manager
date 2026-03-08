@@ -106,7 +106,7 @@ export async function initDatabase(): Promise<boolean> {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS policy_rules (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        field ENUM('title', 'author', 'license', 'description', 'date_updated') NOT NULL,
+        field ENUM('title', 'author', 'license', 'description', 'date_updated', 'age_hours') NOT NULL,
         operator ENUM('eq', 'neq', 'gt', 'lt', 'gte', 'lte', 'regex') NOT NULL,
         value VARCHAR(512) NOT NULL,
         action ENUM('allow', 'block') NOT NULL,

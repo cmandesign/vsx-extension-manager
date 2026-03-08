@@ -2,7 +2,7 @@ import { getPool } from "../db/connection.js";
 import type { Extension } from "../types/marketplace.js";
 import type { PolicyMode, ListType } from "./policy-service.js";
 
-export type RuleField = "title" | "author" | "license" | "description" | "date_updated";
+export type RuleField = "title" | "author" | "license" | "description" | "date_updated" | "age_hours";
 export type RuleOperator = "eq" | "neq" | "gt" | "lt" | "gte" | "lte" | "regex";
 export type RuleAction = "allow" | "block";
 
@@ -88,12 +88,38 @@ function extractField(ext: Extension, field: RuleField): string {
       }
       return (ext as any).lastUpdated || "";
     }
+    case "age_hours": {
+      const versions = ext.versions || [];
+      const dateStr = versions.length > 0
+        ? ((versions[0] as any).lastUpdated || (ext as any).lastUpdated || "")
+        : ((ext as any).lastUpdated || "");
+      if (!dateStr) return "";
+      const ageMs = Date.now() - new Date(dateStr).getTime();
+      if (isNaN(ageMs)) return "";
+      const ageHours = ageMs / (1000 * 60 * 60);
+      return ageHours.toString();
+    }
     default:
       return "";
   }
 }
 
-function evaluateCondition(fieldValue: string, operator: RuleOperator, ruleValue: string): boolean {
+function evaluateCondition(fieldValue: string, operator: RuleOperator, ruleValue: string, isNumeric: boolean): boolean {
+  if (isNumeric) {
+    const numField = parseFloat(fieldValue);
+    const numRule = parseFloat(ruleValue);
+    if (isNaN(numField) || isNaN(numRule)) return false;
+    switch (operator) {
+      case "eq": return numField === numRule;
+      case "neq": return numField !== numRule;
+      case "gt": return numField > numRule;
+      case "lt": return numField < numRule;
+      case "gte": return numField >= numRule;
+      case "lte": return numField <= numRule;
+      default: return false;
+    }
+  }
+
   switch (operator) {
     case "eq":
       return fieldValue.toLowerCase() === ruleValue.toLowerCase();
@@ -120,7 +146,8 @@ function evaluateCondition(fieldValue: string, operator: RuleOperator, ruleValue
 
 function ruleMatches(ext: Extension, rule: PolicyRule): boolean {
   const fieldValue = extractField(ext, rule.field);
-  return evaluateCondition(fieldValue, rule.operator, rule.value);
+  const isNumeric = rule.field === "age_hours";
+  return evaluateCondition(fieldValue, rule.operator, rule.value, isNumeric);
 }
 
 export function isExtensionAllowed(
