@@ -1,0 +1,119 @@
+<%- include('../layout', { title: 'Policy Settings' }) %>
+
+<div class="container mt-4">
+  <h2><i class="bi bi-shield-check"></i> Policy Settings</h2>
+
+  <% if (typeof error !== 'undefined' && error) { %>
+  <div class="alert alert-danger mt-3"><%= error %></div>
+  <% } %>
+  <% if (typeof success !== 'undefined' && success) { %>
+  <div class="alert alert-success mt-3"><%= success %></div>
+  <% } %>
+
+  <!-- Policy Mode -->
+  <div class="card mt-3">
+    <div class="card-header">
+      <h5 class="mb-0">Global Policy Mode</h5>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="/admin/policy/mode">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="mode" id="modeBlacklist" value="blacklist" <%= policyMode === 'blacklist' ? 'checked' : '' %>>
+              <label class="form-check-label" for="modeBlacklist">
+                <strong>Blacklist</strong> <span class="text-muted">- All extensions allowed except those on the blacklist</span>
+              </label>
+            </div>
+            <div class="form-check form-check-inline mt-2">
+              <input class="form-check-input" type="radio" name="mode" id="modeWhitelist" value="whitelist" <%= policyMode === 'whitelist' ? 'checked' : '' %>>
+              <label class="form-check-label" for="modeWhitelist">
+                <strong>Whitelist</strong> <span class="text-muted">- All extensions blocked except those on the whitelist</span>
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Mode</button>
+          </div>
+          <div class="col-md-3">
+            <span class="badge fs-6 <%= policyMode === 'blacklist' ? 'bg-warning text-dark' : 'bg-info' %>">
+              Current: <%= policyMode.toUpperCase() %>
+            </span>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add to Policy List -->
+  <div class="card mt-3">
+    <div class="card-header"><h5 class="mb-0">Add Extension to List</h5></div>
+    <div class="card-body">
+      <form method="POST" action="/admin/policy/list/add">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5">
+            <label for="extensionId" class="form-label">Extension ID</label>
+            <input type="text" class="form-control" id="extensionId" name="extension_id" placeholder="publisher.extensionName" required>
+          </div>
+          <div class="col-md-4">
+            <label for="listType" class="form-label">List</label>
+            <select class="form-select" id="listType" name="list_type">
+              <option value="blacklist">Blacklist</option>
+              <option value="whitelist">Whitelist</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-circle"></i> Add</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Policy List Table -->
+  <div class="card mt-3">
+    <div class="card-header"><h5 class="mb-0">Policy List (<%= policyList.length %> entries)</h5></div>
+    <div class="card-body">
+      <% if (policyList.length === 0) { %>
+        <p class="text-muted text-center mb-0">No extensions on the policy list yet.</p>
+      <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Extension ID</th>
+              <th>Version</th>
+              <th>List</th>
+              <th>Added By</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% policyList.forEach(function(entry) { %>
+            <tr>
+              <td><code><%= entry.extension_id %></code></td>
+              <td><%= entry.version || '<span class="text-muted">All</span>' %></td>
+              <td>
+                <span class="badge <%= entry.list_type === 'whitelist' ? 'bg-success' : 'bg-danger' %>">
+                  <%= entry.list_type %>
+                </span>
+              </td>
+              <td><%= entry.username || '-' %></td>
+              <td><%= new Date(entry.created_at).toLocaleDateString() %></td>
+              <td>
+                <form method="POST" action="/admin/policy/list/<%= entry.id %>/remove" class="d-inline" onsubmit="return confirm('Remove this entry?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../footer') %>
